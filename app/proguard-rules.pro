@@ -1,0 +1,4 @@
+-keep class com.oscar.smartcontrol.protocol.** { *; }
+-keep class com.google.protobuf.** { *; }
+-dontwarn org.bouncycastle.**
+-keep class org.bouncycastle.** { *; }
