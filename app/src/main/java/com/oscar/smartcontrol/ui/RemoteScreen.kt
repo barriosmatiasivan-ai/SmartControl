@@ -392,7 +392,7 @@ private fun TopRemoteHeader(
         is ConnectionState.Connected -> Color(0xFF4ADE80) to connectionState.name
         is ConnectionState.Connecting -> Color(0xFFFBBF24) to "Conectando..."
         is ConnectionState.PairingRequired -> Color(0xFF60A5FA) to "Ingresar PIN"
-        is ConnectionState.Error -> Color(0xFFFF6B6B) to "Sin conexiÃ³n"
+        is ConnectionState.Error -> Color(0xFFFF6B6B) to "Sin conexión"
         ConnectionState.Disconnected -> Color(0xFFFF6B6B) to "Desconectado"
     }
 
@@ -489,7 +489,7 @@ private fun TopRemoteHeader(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 6.dp)
             ) {
-                Icon(Icons.Rounded.Settings, contentDescription = "ConfiguraciÃ³n", modifier = Modifier.size(16.dp))
+                Icon(Icons.Rounded.Settings, contentDescription = "Configuración", modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
                 Text("Ajustes", maxLines = 1, style = MaterialTheme.typography.labelMedium)
             }
@@ -586,7 +586,7 @@ private fun DpadPanel(
                 onClick = { onKey(RemoteKeyCode.KEYCODE_MENU, IrButton.SETTINGS) },
                 modifier = Modifier.size(52.dp)
             ) {
-                Icon(Icons.Rounded.Menu, contentDescription = "MenÃº")
+                Icon(Icons.Rounded.Menu, contentDescription = "Menú")
             }
 
             Surface(
@@ -712,12 +712,12 @@ private fun TouchpadPanel(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
                 Text(
-                    "DeslizÃ¡ para mover â€¢ Tocar = OK",
+                    "Deslizá para mover • Tocar = OK",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "Doble toque = AtrÃ¡s â€¢ Mantener = MenÃº",
+                    "Doble toque = Atrás • Mantener = Menú",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
@@ -1401,7 +1401,7 @@ private fun BottomMediaBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 FilledTonalIconButton(onClick = { onKey(RemoteKeyCode.KEYCODE_BACK, IrButton.BACK) }) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "AtrÃ¡s")
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Atrás")
                 }
                 FilledTonalIconButton(onClick = { onKey(RemoteKeyCode.KEYCODE_MEDIA_REWIND, null) }) {
                     Icon(Icons.Rounded.FastRewind, contentDescription = "Retroceder")
