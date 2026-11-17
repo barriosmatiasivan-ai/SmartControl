@@ -2,14 +2,9 @@ package com.oscar.smartcontrol.protocol.wire;
 
 import android.util.Log;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.nio.ByteBuffer;
 
 public abstract class MessageManager {
-
-    private final Logger logger = LoggerFactory.getLogger(MessageManager.class);
 
     /**
      * Encode a length as a varint (little-endian, 7 bits per byte, MSB=1 means "more bytes follow").
