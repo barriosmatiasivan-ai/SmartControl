@@ -33,7 +33,12 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Backspace
@@ -741,79 +746,141 @@ private fun KeyboardNumpadPanel(
     onSendEnter: () -> Unit,
     onKey: (RemoteKeyCode) -> Unit
 ) {
+    var textMode by remember { mutableStateOf(false) }
     var text by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(textMode) {
+        if (textMode) {
+            focusRequester.requestFocus()
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Comfortable toggle between Numpad (123) and Text Keyboard (ABC)
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                label = { Text("Escribir en la TV") },
-                singleLine = true,
-                modifier = Modifier.weight(1f)
-            )
-            FilledTonalIconButton(
-                onClick = {
-                    if (text.isNotEmpty()) {
-                        onSendText(text)
-                        text = ""
-                    } else {
-                        onSendEnter()
-                    }
+            if (!textMode) {
+                Button(
+                    onClick = { textMode = false },
+                    modifier = Modifier.weight(1f).height(46.dp)
+                ) {
+                    Text("123  Números")
                 }
-            ) {
-                Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = "Enviar")
-            }
-            FilledTonalIconButton(onClick = { onKey(RemoteKeyCode.KEYCODE_DEL) }) {
-                Icon(Icons.AutoMirrored.Rounded.Backspace, contentDescription = "Borrar")
+                OutlinedButton(
+                    onClick = { textMode = true },
+                    modifier = Modifier.weight(1f).height(46.dp)
+                ) {
+                    Text("ABC  Texto")
+                }
+            } else {
+                OutlinedButton(
+                    onClick = { textMode = false },
+                    modifier = Modifier.weight(1f).height(46.dp)
+                ) {
+                    Text("123  Números")
+                }
+                Button(
+                    onClick = { textMode = true },
+                    modifier = Modifier.weight(1f).height(46.dp)
+                ) {
+                    Text("ABC  Texto")
+                }
             }
         }
 
-        val rows = listOf(
-            listOf(
-                "1" to RemoteKeyCode.KEYCODE_1,
-                "2" to RemoteKeyCode.KEYCODE_2,
-                "3" to RemoteKeyCode.KEYCODE_3
-            ),
-            listOf(
-                "4" to RemoteKeyCode.KEYCODE_4,
-                "5" to RemoteKeyCode.KEYCODE_5,
-                "6" to RemoteKeyCode.KEYCODE_6
-            ),
-            listOf(
-                "7" to RemoteKeyCode.KEYCODE_7,
-                "8" to RemoteKeyCode.KEYCODE_8,
-                "9" to RemoteKeyCode.KEYCODE_9
-            ),
-            listOf(
-                "CH-" to RemoteKeyCode.KEYCODE_CHANNEL_DOWN,
-                "0" to RemoteKeyCode.KEYCODE_0,
-                "CH+" to RemoteKeyCode.KEYCODE_CHANNEL_UP
+        if (textMode) {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Escribir texto para la TV") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(
+                    onSend = {
+                        if (text.isNotEmpty()) {
+                            onSendText(text)
+                            text = ""
+                        } else {
+                            onSendEnter()
+                        }
+                    }
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
             )
-        )
-
-        rows.forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                row.forEach { (label, code) ->
-                    FilledTonalButton(
-                        onClick = { onKey(code) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                    ) {
-                        Text(label, style = MaterialTheme.typography.titleMedium)
+                Button(
+                    onClick = {
+                        if (text.isNotEmpty()) {
+                            onSendText(text)
+                            text = ""
+                        } else {
+                            onSendEnter()
+                        }
+                    },
+                    modifier = Modifier.weight(1f).height(50.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (text.isNotEmpty()) "Enviar texto" else "Enter / Buscar")
+                }
+                FilledTonalIconButton(
+                    onClick = { onKey(RemoteKeyCode.KEYCODE_DEL) },
+                    modifier = Modifier.size(50.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.Backspace, contentDescription = "Borrar")
+                }
+            }
+        } else {
+            val rows = listOf(
+                listOf(
+                    "1" to RemoteKeyCode.KEYCODE_1,
+                    "2" to RemoteKeyCode.KEYCODE_2,
+                    "3" to RemoteKeyCode.KEYCODE_3
+                ),
+                listOf(
+                    "4" to RemoteKeyCode.KEYCODE_4,
+                    "5" to RemoteKeyCode.KEYCODE_5,
+                    "6" to RemoteKeyCode.KEYCODE_6
+                ),
+                listOf(
+                    "7" to RemoteKeyCode.KEYCODE_7,
+                    "8" to RemoteKeyCode.KEYCODE_8,
+                    "9" to RemoteKeyCode.KEYCODE_9
+                ),
+                listOf(
+                    "CH-" to RemoteKeyCode.KEYCODE_CHANNEL_DOWN,
+                    "0" to RemoteKeyCode.KEYCODE_0,
+                    "CH+" to RemoteKeyCode.KEYCODE_CHANNEL_UP
+                )
+            )
+
+            rows.forEach { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    row.forEach { (label, code) ->
+                        FilledTonalButton(
+                            onClick = { onKey(code) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(54.dp)
+                        ) {
+                            Text(label, style = MaterialTheme.typography.titleMedium)
+                        }
                     }
                 }
             }
