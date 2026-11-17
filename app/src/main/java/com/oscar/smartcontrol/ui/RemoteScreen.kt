@@ -1,5 +1,11 @@
 package com.oscar.smartcontrol.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -511,7 +517,7 @@ private fun DpadPanel(
         // Circular D-Pad
         Box(
             modifier = Modifier
-                .size(230.dp)
+                .size(280.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surface)
                 .border(1.dp, MaterialTheme.colorScheme.surfaceVariant, CircleShape),
@@ -521,28 +527,28 @@ private fun DpadPanel(
             DpadArrowButton(
                 icon = Icons.Rounded.KeyboardArrowUp,
                 desc = "Arriba",
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
                 onClick = { onKey(RemoteKeyCode.KEYCODE_DPAD_UP, IrButton.UP) }
             )
             // Down
             DpadArrowButton(
                 icon = Icons.Rounded.KeyboardArrowDown,
                 desc = "Abajo",
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
                 onClick = { onKey(RemoteKeyCode.KEYCODE_DPAD_DOWN, IrButton.DOWN) }
             )
             // Left
             DpadArrowButton(
                 icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
                 desc = "Izquierda",
-                modifier = Modifier.align(Alignment.CenterStart).padding(start = 8.dp),
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = 10.dp),
                 onClick = { onKey(RemoteKeyCode.KEYCODE_DPAD_LEFT, IrButton.LEFT) }
             )
             // Right
             DpadArrowButton(
                 icon = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 desc = "Derecha",
-                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp),
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 10.dp),
                 onClick = { onKey(RemoteKeyCode.KEYCODE_DPAD_RIGHT, IrButton.RIGHT) }
             )
             // Center OK
@@ -550,7 +556,7 @@ private fun DpadPanel(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primaryContainer,
                 modifier = Modifier
-                    .size(84.dp)
+                    .size(104.dp)
                     .clip(CircleShape)
                     .clickable { onKey(RemoteKeyCode.KEYCODE_DPAD_CENTER, IrButton.OK) }
             ) {
@@ -624,12 +630,12 @@ private fun DpadArrowButton(
 ) {
     Box(
         modifier = modifier
-            .size(64.dp)
+            .size(78.dp)
             .clip(CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = desc, modifier = Modifier.size(34.dp))
+        Icon(icon, contentDescription = desc, modifier = Modifier.size(38.dp))
     }
 }
 
@@ -1020,55 +1026,65 @@ private fun IrSectionPanel(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    Surface(
-                        shape = RoundedCornerShape(18.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                    AnimatedContent(
+                        targetState = wizardIndex,
+                        transitionSpec = {
+                            (slideInHorizontally { it } + fadeIn()) togetherWith
+                                (slideOutHorizontally { -it } + fadeOut())
+                        },
+                        label = "irVariantSlide"
+                    ) { idx ->
+                        val variant = wizardVariants.getOrNull(idx) ?: currentVariant
+                        Surface(
+                            shape = RoundedCornerShape(18.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                "Variante ${wizardIndex + 1} de ${wizardVariants.size}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                currentVariant.label,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Button(
-                                onClick = onTestCurrentVariant,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(54.dp)
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Icon(Icons.Rounded.PowerSettingsNew, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Probar Power")
-                            }
-                            Text(
-                                "¿Respondió el aparato?",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = onNextVariant,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("No, siguiente")
-                                }
+                                Text(
+                                    "Variante ${idx + 1} de ${wizardVariants.size}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    variant.label,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                                 Button(
-                                    onClick = onConfirmVariant,
-                                    modifier = Modifier.weight(1f)
+                                    onClick = onTestCurrentVariant,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(54.dp)
                                 ) {
-                                    Text("¡Sí, guardar!")
+                                    Icon(Icons.Rounded.PowerSettingsNew, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Probar Power (${idx + 1})")
+                                }
+                                Text(
+                                    "¿Respondió el aparato?",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = onNextVariant,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("No, siguiente")
+                                    }
+                                    Button(
+                                        onClick = onConfirmVariant,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("¡Sí, guardar!")
+                                    }
                                 }
                             }
                         }
