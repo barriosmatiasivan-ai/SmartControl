@@ -32,6 +32,7 @@ class TvConnectionManager(context: Context) {
 
     private var remoteTv: AndroidRemoteTv? = null
     private var reconnectJob: Job? = null
+    private var pairingFallbackJob: Job? = null
     private var shouldAutoReconnect = false
 
     private val _state = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
@@ -87,6 +88,17 @@ class TvConnectionManager(context: Context) {
         }
     }
 
+    fun isHostPaired(host: String): Boolean {
+        val set = prefs.getStringSet("paired_hosts", emptySet()) ?: emptySet()
+        return set.contains(host.trim())
+    }
+
+    private fun markHostPaired(host: String) {
+        val current = (prefs.getStringSet("paired_hosts", emptySet()) ?: emptySet()).toMutableSet()
+        current.add(host.trim())
+        prefs.edit().putStringSet("paired_hosts", current).apply()
+    }
+
     fun connectOrReconnect(host: String, name: String = host, forcePairing: Boolean = false) {
         val cleanHost = host.trim()
         if (cleanHost.isEmpty()) return
@@ -95,6 +107,9 @@ class TvConnectionManager(context: Context) {
         savedName = name
         shouldAutoReconnect = true
         reconnectJob?.cancel()
+        pairingFallbackJob?.cancel()
+
+        val needPairing = forcePairing || !isHostPaired(cleanHost)
 
         scope.launch {
             disconnectInternal(keepAutoReconnect = true)
@@ -106,16 +121,25 @@ class TvConnectionManager(context: Context) {
                 _volumeState.value = Triple(level, maxLevel, muted)
             }
 
+            if (!needPairing) {
+                pairingFallbackJob = scope.launch {
+                    delay(3500)
+                    if (_state.value is ConnectionState.Connecting) {
+                        connectOrReconnect(cleanHost, name, forcePairing = true)
+                    }
+                }
+            }
+
             val listener = createListener(cleanHost, name)
             try {
-                if (forcePairing) {
+                if (needPairing) {
                     tv.connect(cleanHost, listener)
                 } else {
                     tv.reconnect(cleanHost, listener)
                 }
             } catch (e: Exception) {
-                // If reconnect failed (e.g. certificate not paired yet), fall back to pairing
-                if (!forcePairing) {
+                pairingFallbackJob?.cancel()
+                if (!needPairing) {
                     try {
                         tv.abort()
                         val pairingTv = AndroidRemoteTv()
@@ -257,6 +281,7 @@ class TvConnectionManager(context: Context) {
         override fun onSessionCreated() {}
 
         override fun onSecretRequested() {
+            pairingFallbackJob?.cancel()
             _state.value = ConnectionState.PairingRequired(host)
         }
 
@@ -267,6 +292,8 @@ class TvConnectionManager(context: Context) {
         }
 
         override fun onConnected() {
+            pairingFallbackJob?.cancel()
+            markHostPaired(host)
             _state.value = ConnectionState.Connected(host, name)
         }
 

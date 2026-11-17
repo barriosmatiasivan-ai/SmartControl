@@ -100,19 +100,11 @@ fun DevicePickerDialog(
             }
         },
         confirmButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(
-                    enabled = manualIp.isNotBlank(),
-                    onClick = { onConnectManual(manualIp.trim(), true) }
-                ) {
-                    Text("Emparejar PIN")
-                }
-                TextButton(
-                    enabled = manualIp.isNotBlank(),
-                    onClick = { onConnectManual(manualIp.trim(), false) }
-                ) {
-                    Text("Conectar")
-                }
+            TextButton(
+                enabled = manualIp.isNotBlank(),
+                onClick = { onConnectManual(manualIp.trim(), false) }
+            ) {
+                Text("Conectar")
             }
         },
         dismissButton = {

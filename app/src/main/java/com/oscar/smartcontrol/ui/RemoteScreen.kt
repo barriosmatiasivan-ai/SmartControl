@@ -195,14 +195,20 @@ fun RemoteScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Mode Tabs
+            // Mode Tabs (IR sections only shown on devices with hardware IR blaster)
+            val availableTabs = remember(viewModel.hasIrBlaster) {
+                if (viewModel.hasIrBlaster) RemoteTab.entries
+                else RemoteTab.entries.filter { it != RemoteTab.IR && it != RemoteTab.IRDB }
+            }
+            val activeTabIndex = availableTabs.indexOf(selectedTab).coerceAtLeast(0)
+
             ScrollableTabRow(
-                selectedTabIndex = selectedTab.ordinal,
+                selectedTabIndex = activeTabIndex,
                 edgePadding = 0.dp,
                 containerColor = Color.Transparent,
                 divider = {}
             ) {
-                RemoteTab.entries.forEach { tab ->
+                availableTabs.forEach { tab ->
                     Tab(
                         selected = selectedTab == tab,
                         onClick = {
