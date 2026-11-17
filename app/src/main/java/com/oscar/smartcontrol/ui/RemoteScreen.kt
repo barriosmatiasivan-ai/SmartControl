@@ -38,6 +38,7 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Cast
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Home
@@ -77,6 +78,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -98,7 +100,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.oscar.smartcontrol.ir.FlipperIrEntry
 import com.oscar.smartcontrol.ir.IrButton
-import com.oscar.smartcontrol.ir.IrDbItem
+import com.oscar.smartcontrol.ir.IrDeviceCategory
+import com.oscar.smartcontrol.ir.IrVariant
+import com.oscar.smartcontrol.ir.SavedIrRemote
 import com.oscar.smartcontrol.ir.TvBrand
 import com.oscar.smartcontrol.protocol.remote.Remotemessage.RemoteKeyCode
 import com.oscar.smartcontrol.tv.ConnectionState
@@ -120,12 +124,15 @@ fun RemoteScreen(
     val irFallback by viewModel.irFallback.collectAsState()
     val touchSensitivity by viewModel.touchSensitivity.collectAsState()
     val statusToast by viewModel.statusToast.collectAsState()
-    val irScanBrand by viewModel.irScanBrand.collectAsState()
-    val flipperButtons by viewModel.flipperButtons.collectAsState()
-    val irdbCategories by viewModel.irdbCategories.collectAsState()
-    val irdbResults by viewModel.irdbResults.collectAsState()
-    val selectedIrDbItem by viewModel.selectedIrDbItem.collectAsState()
-    val selectedIrDbButtons by viewModel.selectedIrDbButtons.collectAsState()
+    val savedIrRemotes by viewModel.savedIrRemotes.collectAsState()
+    val activeIrRemote by viewModel.activeIrRemote.collectAsState()
+    val activeIrFileButtons by viewModel.activeIrFileButtons.collectAsState()
+    val wizardStep by viewModel.wizardStep.collectAsState()
+    val wizardCategory by viewModel.wizardCategory.collectAsState()
+    val wizardBrands by viewModel.wizardBrands.collectAsState()
+    val wizardSelectedBrand by viewModel.wizardSelectedBrand.collectAsState()
+    val wizardVariants by viewModel.wizardVariants.collectAsState()
+    val wizardIndex by viewModel.wizardIndex.collectAsState()
     val castStatus by viewModel.castStatus.collectAsState()
 
     var showDevicePicker by remember { mutableStateOf(false) }
@@ -195,10 +202,10 @@ fun RemoteScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Mode Tabs (IR sections only shown on devices with hardware IR blaster)
+            // Mode Tabs (IR section only shown on devices with hardware IR blaster)
             val availableTabs = remember(viewModel.hasIrBlaster) {
                 if (viewModel.hasIrBlaster) RemoteTab.entries
-                else RemoteTab.entries.filter { it != RemoteTab.IR && it != RemoteTab.IRDB }
+                else RemoteTab.entries.filter { it != RemoteTab.IR }
             }
             val activeTabIndex = availableTabs.indexOf(selectedTab).coerceAtLeast(0)
 
@@ -271,46 +278,43 @@ fun RemoteScreen(
                         }
                     )
 
-                    RemoteTab.IR -> IrUniversalPanel(
-                        hasIr = viewModel.hasIrBlaster,
-                        selectedBrand = irBrand,
+                    RemoteTab.IR -> IrSectionPanel(
+                        savedRemotes = savedIrRemotes,
+                        activeRemote = activeIrRemote,
+                        activeFileButtons = activeIrFileButtons,
                         irFallback = irFallback,
-                        irScanBrand = irScanBrand,
-                        flipperButtons = flipperButtons,
-                        savedCustomCode = viewModel.connectionManager.customIrCode,
-                        onSelectBrand = { viewModel.setIrBrand(it) },
-                        onToggleFallback = { viewModel.setIrFallback(it) },
-                        onStartScan = { viewModel.startIrBrandScan() },
-                        onStopScan = { confirm -> viewModel.stopIrBrandScan(confirm) },
-                        onSendIr = { btn ->
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            viewModel.sendIrButton(btn)
+                        wizardStep = wizardStep,
+                        wizardCategory = wizardCategory,
+                        wizardBrands = wizardBrands,
+                        wizardSelectedBrand = wizardSelectedBrand,
+                        wizardVariants = wizardVariants,
+                        wizardIndex = wizardIndex,
+                        onStartWizard = { viewModel.startIrWizard() },
+                        onWizardBack = { viewModel.wizardBack() },
+                        onCancelWizard = { viewModel.cancelIrWizard() },
+                        onSelectCategory = { viewModel.selectWizardCategory(it) },
+                        onSelectBrand = { viewModel.selectWizardBrand(it) },
+                        onTestCurrentVariant = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            viewModel.testCurrentIrVariant()
                         },
-                        onSendCustomIr = { code ->
+                        onNextVariant = { viewModel.nextIrVariant() },
+                        onConfirmVariant = { viewModel.confirmCurrentIrVariant() },
+                        onPickVariantDirectly = { idx -> viewModel.selectWizardVariantDirectly(idx) },
+                        onSelectSavedRemote = { viewModel.selectSavedIrRemote(it) },
+                        onDeleteSavedRemote = { viewModel.deleteSavedIrRemote(it) },
+                        onToggleFallback = { viewModel.setIrFallback(it) },
+                        onSendPreset = { btn ->
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            viewModel.sendActivePresetButton(btn)
+                        },
+                        onSendFileEntry = { entry ->
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            viewModel.sendFlipperEntry(entry)
+                        },
+                        onSendCustomCode = { code ->
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             viewModel.sendCustomIr(code)
-                        },
-                        onImportFlipper = { content ->
-                            viewModel.importFlipperFile(content)
-                        },
-                        onSendFlipperEntry = { entry ->
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            viewModel.sendFlipperEntry(entry)
-                        }
-                    )
-
-                    RemoteTab.IRDB -> IrDbBrowserPanel(
-                        hasIr = viewModel.hasIrBlaster,
-                        categories = irdbCategories,
-                        results = irdbResults,
-                        selectedItem = selectedIrDbItem,
-                        selectedButtons = selectedIrDbButtons,
-                        onSearch = { q, cat -> viewModel.searchIrDb(q, cat) },
-                        onSelectItem = { item -> viewModel.openIrDbItem(item) },
-                        onCloseItem = { viewModel.closeIrDbItem() },
-                        onSendEntry = { entry ->
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            viewModel.sendFlipperEntry(entry)
                         }
                     )
                 }
@@ -377,7 +381,7 @@ private fun TopRemoteHeader(
         is ConnectionState.Connected -> Color(0xFF4ADE80) to connectionState.name
         is ConnectionState.Connecting -> Color(0xFFFBBF24) to "Conectando..."
         is ConnectionState.PairingRequired -> Color(0xFF60A5FA) to "Ingresar PIN"
-        is ConnectionState.Error -> Color(0xFFFF6B6B) to "Sin conexión"
+        is ConnectionState.Error -> Color(0xFFFF6B6B) to "Sin conexiÃ³n"
         ConnectionState.Disconnected -> Color(0xFFFF6B6B) to "Desconectado"
     }
 
@@ -474,7 +478,7 @@ private fun TopRemoteHeader(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 6.dp)
             ) {
-                Icon(Icons.Rounded.Settings, contentDescription = "Configuración", modifier = Modifier.size(16.dp))
+                Icon(Icons.Rounded.Settings, contentDescription = "ConfiguraciÃ³n", modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
                 Text("Ajustes", maxLines = 1, style = MaterialTheme.typography.labelMedium)
             }
@@ -571,7 +575,7 @@ private fun DpadPanel(
                 onClick = { onKey(RemoteKeyCode.KEYCODE_MENU, IrButton.SETTINGS) },
                 modifier = Modifier.size(52.dp)
             ) {
-                Icon(Icons.Rounded.Menu, contentDescription = "Menú")
+                Icon(Icons.Rounded.Menu, contentDescription = "MenÃº")
             }
 
             Surface(
@@ -697,12 +701,12 @@ private fun TouchpadPanel(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
                 Text(
-                    "Deslizá para mover • Tocar = OK",
+                    "DeslizÃ¡ para mover â€¢ Tocar = OK",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "Doble toque = Atrás • Mantener = Menú",
+                    "Doble toque = AtrÃ¡s â€¢ Mantener = MenÃº",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
@@ -875,327 +879,385 @@ private fun AppsPanel(
 }
 
 @Composable
-private fun IrUniversalPanel(
-    hasIr: Boolean,
-    selectedBrand: TvBrand,
+private fun IrSectionPanel(
+    savedRemotes: List<SavedIrRemote>,
+    activeRemote: SavedIrRemote?,
+    activeFileButtons: List<FlipperIrEntry>,
     irFallback: Boolean,
-    irScanBrand: TvBrand?,
-    flipperButtons: List<FlipperIrEntry>,
-    savedCustomCode: String,
-    onSelectBrand: (TvBrand) -> Unit,
+    wizardStep: IrWizardStep,
+    wizardCategory: IrDeviceCategory,
+    wizardBrands: List<String>,
+    wizardSelectedBrand: String?,
+    wizardVariants: List<IrVariant>,
+    wizardIndex: Int,
+    onStartWizard: () -> Unit,
+    onWizardBack: () -> Unit,
+    onCancelWizard: () -> Unit,
+    onSelectCategory: (IrDeviceCategory) -> Unit,
+    onSelectBrand: (String?) -> Unit,
+    onTestCurrentVariant: () -> Unit,
+    onNextVariant: () -> Unit,
+    onConfirmVariant: () -> Unit,
+    onPickVariantDirectly: (Int) -> Unit,
+    onSelectSavedRemote: (SavedIrRemote) -> Unit,
+    onDeleteSavedRemote: (SavedIrRemote) -> Unit,
     onToggleFallback: (Boolean) -> Unit,
-    onStartScan: () -> Unit,
-    onStopScan: (Boolean) -> Unit,
-    onSendIr: (IrButton) -> Unit,
-    onSendCustomIr: (String) -> Unit,
-    onImportFlipper: (String) -> Unit,
-    onSendFlipperEntry: (FlipperIrEntry) -> Unit
+    onSendPreset: (IrButton) -> Unit,
+    onSendFileEntry: (FlipperIrEntry) -> Unit,
+    onSendCustomCode: (String) -> Unit
 ) {
-    var brandMenuOpen by remember { mutableStateOf(false) }
-    var customCode by remember { mutableStateOf(savedCustomCode) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        if (!hasIr) {
-            Surface(
-                color = MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    "Este celular no tiene emisor IR de hardware. Los botones IR solo funcionarán en teléfonos con blaster IR (Xiaomi, Poco, Redmi, Huawei, etc.).",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(12.dp)
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(modifier = Modifier.weight(1f)) {
-                OutlinedButton(onClick = { brandMenuOpen = true }) {
-                    Icon(Icons.Rounded.SettingsRemote, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        selectedBrand.displayName,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                DropdownMenu(
-                    expanded = brandMenuOpen,
-                    onDismissRequest = { brandMenuOpen = false }
-                ) {
-                    TvBrand.entries.forEach { brand ->
-                        DropdownMenuItem(
-                            text = { Text(brand.displayName) },
-                            onClick = {
-                                onSelectBrand(brand)
-                                brandMenuOpen = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Auto IR", style = MaterialTheme.typography.labelMedium)
-                Spacer(Modifier.width(6.dp))
-                Switch(checked = irFallback, onCheckedChange = onToggleFallback)
-            }
-        }
-
-        // Auto-detect TV brand scanner
-        if (irScanBrand != null) {
-            Surface(
-                color = MaterialTheme.colorScheme.primaryContainer,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Probando: ${irScanBrand.displayName}",
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Button(onClick = { onStopScan(true) }) {
-                        Text("¡Funcionó!")
-                    }
-                }
-            }
-        } else {
-            OutlinedButton(
-                onClick = onStartScan,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Auto-detectar TV (probar Power en todas las marcas)")
-            }
-        }
-
-        val irRows = listOf(
-            listOf(IrButton.POWER, IrButton.INPUT, IrButton.SETTINGS),
-            listOf(IrButton.VOL_UP, IrButton.MUTE, IrButton.VOL_DOWN),
-            listOf(IrButton.CH_UP, IrButton.HOME, IrButton.CH_DOWN),
-            listOf(IrButton.UP, IrButton.OK, IrButton.BACK),
-            listOf(IrButton.LEFT, IrButton.DOWN, IrButton.RIGHT)
-        )
-
-        irRows.forEach { row ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                row.forEach { btn ->
-                    FilledTonalButton(
-                        onClick = { onSendIr(btn) },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(btn.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-            }
-        }
-
-        if (flipperButtons.isNotEmpty()) {
-            Text(
-                "Botones importados (.ir)",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-            flipperButtons.chunked(3).forEach { row ->
+    when (wizardStep) {
+        IrWizardStep.PICK_CATEGORY -> {
+            Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    row.forEach { entry ->
-                        FilledTonalButton(
-                            onClick = { onSendFlipperEntry(entry) },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(entry.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
+                    FilledTonalIconButton(onClick = onWizardBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
                     }
+                    Text("1. Elegí el tipo de aparato", style = MaterialTheme.typography.titleMedium)
                 }
-            }
-        }
 
-        OutlinedTextField(
-            value = customCode,
-            onValueChange = { customCode = it },
-            label = { Text("Pronto Hex o archivo .ir de Flipper Zero") },
-            minLines = 2,
-            maxLines = 4,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                enabled = customCode.isNotBlank(),
-                onClick = { onSendCustomIr(customCode) },
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Transmitir 1")
-            }
-            FilledTonalButton(
-                enabled = customCode.isNotBlank(),
-                onClick = { onImportFlipper(customCode) },
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Importar .ir")
-            }
-        }
-    }
-}
-
-@Composable
-private fun IrDbBrowserPanel(
-    hasIr: Boolean,
-    categories: List<String>,
-    results: List<IrDbItem>,
-    selectedItem: IrDbItem?,
-    selectedButtons: List<FlipperIrEntry>,
-    onSearch: (String, String?) -> Unit,
-    onSelectItem: (IrDbItem) -> Unit,
-    onCloseItem: () -> Unit,
-    onSendEntry: (FlipperIrEntry) -> Unit
-) {
-    var query by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf<String?>(null) }
-
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        if (!hasIr) {
-            Text(
-                "Sin emisor IR en este celular (podés explorar los 1.957 controles igualmente).",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error
-            )
-        }
-
-        if (selectedItem != null) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilledTonalIconButton(onClick = onCloseItem) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        selectedItem.displayTitle,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        "${selectedItem.category} • ${selectedButtons.size} botones",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            if (selectedButtons.isEmpty()) {
-                Text(
-                    "No se encontraron comandos compatibles en este archivo.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
                     modifier = Modifier.weight(1f),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(selectedButtons) { entry ->
+                    items(IrDeviceCategory.entries) { cat ->
                         FilledTonalButton(
-                            onClick = { onSendEntry(entry) },
-                            modifier = Modifier.height(48.dp),
-                            shape = RoundedCornerShape(12.dp)
+                            onClick = { onSelectCategory(cat) },
+                            modifier = Modifier.height(58.dp),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text(cat.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+        }
+
+        IrWizardStep.PICK_BRAND -> {
+            var brandQuery by remember { mutableStateOf("") }
+            val filtered = remember(wizardBrands, brandQuery) {
+                val q = brandQuery.trim().lowercase()
+                if (q.isEmpty()) wizardBrands else wizardBrands.filter { it.lowercase().contains(q) }
+            }
+
+            Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilledTonalIconButton(onClick = onWizardBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
+                    }
+                    Text("2. Marca (${wizardCategory.title})", style = MaterialTheme.typography.titleMedium)
+                }
+
+                OutlinedTextField(
+                    value = brandQuery,
+                    onValueChange = { brandQuery = it },
+                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                    label = { Text("Buscar marca (ej. RCA, Samsung, Midea...)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Button(
+                    onClick = { onSelectBrand(null) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Universal (probar todas las marcas de ${wizardCategory.title})")
+                }
+
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(filtered) { brand ->
+                        ListItem(
+                            headlineContent = { Text(brand) },
+                            leadingContent = { Icon(Icons.Rounded.SettingsRemote, contentDescription = null) },
+                            modifier = Modifier.clickable { onSelectBrand(brand) }
+                        )
+                    }
+                }
+            }
+        }
+
+        IrWizardStep.PAIR_TEST -> {
+            val currentVariant = wizardVariants.getOrNull(wizardIndex)
+            var showManualList by remember { mutableStateOf(false) }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalIconButton(onClick = onWizardBack) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
+                        }
+                        Text(
+                            "3. Vincular ${wizardSelectedBrand ?: "Universal"}",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                    TextButton(onClick = onCancelWizard) { Text("Cancelar") }
+                }
+
+                if (currentVariant == null) {
+                    Text(
+                        "No se encontraron perfiles para esta selección.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Text(
-                                entry.name.replace('_', ' '),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                "Variante ${wizardIndex + 1} de ${wizardVariants.size}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                currentVariant.label,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Button(
+                                onClick = onTestCurrentVariant,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(54.dp)
+                            ) {
+                                Icon(Icons.Rounded.PowerSettingsNew, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Probar Power")
+                            }
+                            Text(
+                                "¿Respondió el aparato?",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = onNextVariant,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("No, siguiente")
+                                }
+                                Button(
+                                    onClick = onConfirmVariant,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("¡Sí, guardar!")
+                                }
+                            }
+                        }
+                    }
+
+                    TextButton(
+                        onClick = { showManualList = !showManualList },
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    ) {
+                        Text(if (showManualList) "Ocultar lista manual" else "Elegir modelo manualmente (${wizardVariants.size})")
+                    }
+
+                    if (showManualList) {
+                        wizardVariants.forEachIndexed { idx, v ->
+                            ListItem(
+                                headlineContent = { Text(v.label) },
+                                supportingContent = { Text(v.brandName) },
+                                modifier = Modifier.clickable { onPickVariantDirectly(idx) }
                             )
                         }
                     }
                 }
             }
-        } else {
-            OutlinedTextField(
-                value = query,
-                onValueChange = {
-                    query = it
-                    onSearch(it, selectedCategory)
-                },
-                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                label = { Text("Buscar en 1.957 controles (RCA, AC, Epson, LED...)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+        }
 
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                item {
-                    FilterChip(
-                        selected = selectedCategory == null,
-                        onClick = {
-                            selectedCategory = null
-                            onSearch(query, null)
-                        },
-                        label = { Text("Todos") }
-                    )
-                }
-                items(categories) { cat ->
-                    FilterChip(
-                        selected = selectedCategory == cat,
-                        onClick = {
-                            val next = if (selectedCategory == cat) null else cat
-                            selectedCategory = next
-                            onSearch(query, next)
-                        },
-                        label = { Text(cat) }
-                    )
-                }
-            }
+        IrWizardStep.NONE -> {
+            if (savedRemotes.isEmpty() || activeRemote == null) {
+                var showCustom by remember { mutableStateOf(false) }
+                var customCode by remember { mutableStateOf("") }
 
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(results) { item ->
-                    ListItem(
-                        headlineContent = {
-                            Text(item.displayTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        },
-                        supportingContent = { Text(item.category) },
-                        leadingContent = { Icon(Icons.Rounded.SettingsRemote, contentDescription = null) },
-                        modifier = Modifier.clickable { onSelectItem(item) }
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        Icons.Rounded.SettingsRemote,
+                        contentDescription = null,
+                        modifier = Modifier.size(56.dp),
+                        tint = MaterialTheme.colorScheme.primary
                     )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Sin controles IR vinculados",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Elegí la categoría (TV, Aire, Audio, etc.), la marca y probá el encendido automático o manual.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    Button(
+                        onClick = onStartWizard,
+                        modifier = Modifier.height(48.dp)
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Agregar control IR")
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    TextButton(onClick = { showCustom = !showCustom }) {
+                        Text(if (showCustom) "Ocultar código manual" else "Enviar código manual (Pronto Hex / .ir)")
+                    }
+                    if (showCustom) {
+                        OutlinedTextField(
+                            value = customCode,
+                            onValueChange = { customCode = it },
+                            label = { Text("Pronto Hex o bloque .ir") },
+                            minLines = 2,
+                            maxLines = 4,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Button(
+                            enabled = customCode.isNotBlank(),
+                            onClick = { onSendCustomCode(customCode) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Transmitir")
+                        }
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Saved remotes selector + Add button
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(savedRemotes) { remote ->
+                            FilterChip(
+                                selected = remote.id == activeRemote.id,
+                                onClick = { onSelectSavedRemote(remote) },
+                                label = { Text(remote.name, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                            )
+                        }
+                        item {
+                            FilledTonalButton(onClick = onStartWizard) {
+                                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Agregar")
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Auto IR (respaldo Wi-Fi)", style = MaterialTheme.typography.labelMedium)
+                            Spacer(Modifier.width(6.dp))
+                            Switch(checked = irFallback, onCheckedChange = onToggleFallback)
+                        }
+                        FilledTonalIconButton(onClick = { onDeleteSavedRemote(activeRemote) }) {
+                            Icon(Icons.Rounded.Delete, contentDescription = "Eliminar control")
+                        }
+                    }
+
+                    if (activeRemote.presetBrandName != null) {
+                        val irRows = listOf(
+                            listOf(IrButton.POWER, IrButton.INPUT, IrButton.SETTINGS),
+                            listOf(IrButton.VOL_UP, IrButton.MUTE, IrButton.VOL_DOWN),
+                            listOf(IrButton.CH_UP, IrButton.HOME, IrButton.CH_DOWN),
+                            listOf(IrButton.UP, IrButton.OK, IrButton.BACK),
+                            listOf(IrButton.LEFT, IrButton.DOWN, IrButton.RIGHT)
+                        )
+                        irRows.forEach { row ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                row.forEach { btn ->
+                                    FilledTonalButton(
+                                        onClick = { onSendPreset(btn) },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text(btn.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        if (activeFileButtons.isEmpty()) {
+                            Text(
+                                "Cargando botones...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            activeFileButtons.chunked(2).forEach { row ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    row.forEach { entry ->
+                                        FilledTonalButton(
+                                            onClick = { onSendFileEntry(entry) },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text(
+                                                entry.name.replace('_', ' '),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
-
 @Composable
 private fun BottomMediaBar(
     volumeState: Triple<Int, Int, Boolean>?,
@@ -1256,7 +1318,7 @@ private fun BottomMediaBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 FilledTonalIconButton(onClick = { onKey(RemoteKeyCode.KEYCODE_BACK, IrButton.BACK) }) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Atrás")
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "AtrÃ¡s")
                 }
                 FilledTonalIconButton(onClick = { onKey(RemoteKeyCode.KEYCODE_MEDIA_REWIND, null) }) {
                     Icon(Icons.Rounded.FastRewind, contentDescription = "Retroceder")
