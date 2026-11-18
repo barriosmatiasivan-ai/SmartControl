@@ -11,4 +11,7 @@
 *.apk
 *.aab
 *.keystore
+*.jks
+*.p12
+dist/
 !gradle/wrapper/gradle-wrapper.jar

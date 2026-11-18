@@ -1,4 +1,4 @@
-name: Build SmartControl APK
+name: Build SmartControl APK & Play Store AAB
 
 on:
   push:
@@ -27,8 +27,21 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Build Debug & Release APKs
-        run: ./gradlew assembleDebug assembleRelease --stacktrace
+      - name: Decode Release Keystore (if configured)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/release-upload.p12"
+            echo "KEYSTORE_FILE=$GITHUB_WORKSPACE/release-upload.p12" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build Debug APK, Signed Release APK & Play Store AAB
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleDebug assembleRelease bundleRelease --stacktrace
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
@@ -36,8 +49,14 @@ jobs:
           name: SmartControl-debug-apk
           path: app/build/outputs/apk/debug/*.apk
 
-      - name: Upload Release APK (unsigned)
+      - name: Upload Signed Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: SmartControl-release-unsigned-apk
+          name: SmartControl-release-apk
           path: app/build/outputs/apk/release/*.apk
+
+      - name: Upload Play Store AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartControl-playstore-aab
+          path: app/build/outputs/bundle/release/*.aab
